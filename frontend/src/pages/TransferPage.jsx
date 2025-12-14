@@ -4,8 +4,8 @@ import { useTransfer } from '../context/TransferContext'
 import { useSocket } from '../hooks/useSocket'
 import { useWebRTCContext } from '../context/WebRTCContext'
 import { formatFileSize, formatSpeed, formatTimeRemaining, getFileIcon } from '../utils/formatters'
-import { calculateSHA256FromBuffer, calculateSHA256 } from '../utils/crypto'
-import { reassembleChunks, downloadFile } from '../utils/fileUtils'
+import { calculateSHA256 } from '../utils/crypto'
+import { reassembleChunks } from '../utils/fileUtils'
 
 export default function TransferPage() {
   const navigate = useNavigate()
@@ -172,9 +172,10 @@ export default function TransferPage() {
     return () => {
       if (role === 'receiver') {
         setMessageHandler(null)
+        cleanupChunks()
       }
     }
-  }, [role, handleMessage, setMessageHandler])
+  }, [role, handleMessage, setMessageHandler, cleanupChunks])
 
   useEffect(() => {
     setStateChangeHandler((state) => {
@@ -182,9 +183,10 @@ export default function TransferPage() {
         setStatus('transferring')
       } else if (state === 'failed' || state === 'disconnected') {
         setStatus('error')
+        cleanupChunks()
       }
     })
-  }, [setStateChangeHandler])
+  }, [setStateChangeHandler, cleanupChunks])
 
   useEffect(() => {
     const dataChannelReady = isDataChannelReady()
@@ -237,7 +239,16 @@ export default function TransferPage() {
     return () => off('transfer-complete', handleComplete)
   }, [role, on, off, navigate, setHashVerified])
 
+  const cleanupChunks = useCallback(() => {
+    chunksRef.current = []
+    receivedChunksSetRef.current.clear()
+    receivedBytesRef.current = 0
+    fileMetaRef.current = null
+    pendingChunkIndexRef.current = null
+  }, [])
+
   const handleCancel = () => {
+    cleanupChunks()
     emit('transfer-error', { message: 'Transfer cancelled' })
     navigate('/')
   }

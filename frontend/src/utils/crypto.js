@@ -2,6 +2,9 @@
  * Calculate SHA-256 hash of a file
  */
 export async function calculateSHA256(file) {
+    if (!crypto || !crypto.subtle) {
+        throw new Error('Web Crypto API not available. Please use HTTPS or localhost.')
+    }
     const arrayBuffer = await file.arrayBuffer()
     const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
@@ -13,6 +16,9 @@ export async function calculateSHA256(file) {
  * Calculate SHA-256 hash of an ArrayBuffer
  */
 export async function calculateSHA256FromBuffer(buffer) {
+    if (!crypto || !crypto.subtle) {
+        throw new Error('Web Crypto API not available. Please use HTTPS or localhost.')
+    }
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')

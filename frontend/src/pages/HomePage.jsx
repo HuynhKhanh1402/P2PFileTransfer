@@ -26,7 +26,11 @@ export default function HomePage() {
       setHash(fileHash)
     } catch (err) {
       console.error('Error calculating hash:', err)
-      setError('Failed to calculate file hash')
+      if (err.message.includes('Web Crypto API')) {
+        setError('Crypto API not available. Please use HTTPS or localhost.')
+      } else {
+        setError('Failed to calculate file hash')
+      }
     } finally {
       setIsHashing(false)
     }
