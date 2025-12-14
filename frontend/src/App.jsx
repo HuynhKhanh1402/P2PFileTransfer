@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { TransferProvider } from './context/TransferContext'
+import { WebRTCProvider } from './context/WebRTCContext'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import SharePage from './pages/SharePage'
@@ -11,7 +12,8 @@ import ResultPage from './pages/ResultPage'
 function App() {
   return (
     <TransferProvider>
-      <BrowserRouter>
+      <WebRTCProvider>
+        <BrowserRouter>
         <Layout>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -22,7 +24,8 @@ function App() {
             <Route path="/result" element={<ResultPage />} />
           </Routes>
         </Layout>
-      </BrowserRouter>
+        </BrowserRouter>
+      </WebRTCProvider>
     </TransferProvider>
   )
 }

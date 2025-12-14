@@ -6,7 +6,7 @@ import { useSocket } from '../hooks/useSocket'
 export default function ReceivePage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { setRole, setSessionCode } = useTransfer()
+  const { setRole, setSessionCode, setFileMeta } = useTransfer()
   const { isConnected, emit, on, off } = useSocket()
   
   const [code, setCode] = useState(['', '', '', '', '', ''])
@@ -104,19 +104,26 @@ export default function ReceivePage() {
       navigate('/confirm')
     }
 
+    const handleFileMeta = (data) => {
+      console.log('Received file meta in ReceivePage:', data)
+      setFileMeta(data)
+    }
+
     const handleError = (data) => {
       setError(data.message)
       setIsConnecting(false)
     }
 
     on('session-joined', handleSessionJoined)
+    on('file-meta', handleFileMeta)
     on('error', handleError)
 
     return () => {
       off('session-joined', handleSessionJoined)
+      off('file-meta', handleFileMeta)
       off('error', handleError)
     }
-  }, [on, off, navigate])
+  }, [on, off, navigate, setFileMeta])
 
   return (
     <div className="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8">

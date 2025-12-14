@@ -6,9 +6,9 @@ export function TransferProvider({ children }) {
   const [file, setFile] = useState(null)
   const [fileHash, setFileHash] = useState(null)
   const [sessionCode, setSessionCode] = useState(null)
-  const [role, setRole] = useState(null) // 'sender' or 'receiver'
+  const [role, setRole] = useState(null)
   const [fileMeta, setFileMeta] = useState(null)
-  const [transferStatus, setTransferStatus] = useState('idle') // idle, connecting, waiting, transferring, complete, error
+  const [transferStatus, setTransferStatus] = useState('idle')
   const [transferProgress, setTransferProgress] = useState(0)
   const [transferSpeed, setTransferSpeed] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(null)

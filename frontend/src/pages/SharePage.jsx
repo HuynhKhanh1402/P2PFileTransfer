@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { useTransfer } from '../context/TransferContext'
 import { useSocket } from '../hooks/useSocket'
-import { useWebRTC } from '../hooks/useWebRTC'
+import { useWebRTCContext } from '../context/WebRTCContext'
 import { formatFileSize, formatHash, getFileIcon } from '../utils/formatters'
 
 export default function SharePage() {
@@ -23,26 +23,24 @@ export default function SharePage() {
   const [copied, setCopied] = useState(false)
   const offerSentRef = useRef(false)
   
-  const handleMessage = useCallback((data) => {
-    console.log('Received message:', data)
-  }, [])
-
-  const handleStateChange = useCallback((state) => {
-    console.log('WebRTC state:', state)
-    if (state === 'connected') {
-      setStatus('ready')
-    }
-  }, [])
-
   const { 
     createOffer, 
     setRemoteDescription,
     sendFile,
-    close: closeRTC 
-  } = useWebRTC({
-    onMessage: handleMessage,
-    onStateChange: handleStateChange,
-  })
+    close: closeRTC,
+    setStateChangeHandler,
+    connectionState,
+  } = useWebRTCContext()
+
+  // Handle WebRTC state changes
+  useEffect(() => {
+    setStateChangeHandler((state) => {
+      console.log('WebRTC state:', state)
+      if (state === 'connected') {
+        setStatus('ready')
+      }
+    })
+  }, [setStateChangeHandler])
 
   // Join session as sender
   useEffect(() => {

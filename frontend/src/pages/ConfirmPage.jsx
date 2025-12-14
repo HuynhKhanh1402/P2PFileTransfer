@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { useSocket } from '../hooks/useSocket'
-import { useWebRTC } from '../hooks/useWebRTC'
+import { useWebRTCContext } from '../context/WebRTCContext'
 import { formatFileSize, formatHash, getFileIcon } from '../utils/formatters'
 
 export default function ConfirmPage() {
@@ -18,24 +18,21 @@ export default function ConfirmPage() {
   const { socket, emit, on, off } = useSocket()
   const [isAccepting, setIsAccepting] = useState(false)
 
-  const handleMessage = useCallback((data) => {
-    console.log('Received message:', data)
-  }, [])
-
-  const handleStateChange = useCallback((state) => {
-    console.log('WebRTC state:', state)
-    if (state === 'connected') {
-      setTransferStatus('connected')
-    }
-  }, [setTransferStatus])
-
   const { 
     createAnswer, 
     setRemoteDescription,
-  } = useWebRTC({
-    onMessage: handleMessage,
-    onStateChange: handleStateChange,
-  })
+    setStateChangeHandler,
+  } = useWebRTCContext()
+
+  // Handle WebRTC state changes
+  useEffect(() => {
+    setStateChangeHandler((state) => {
+      console.log('WebRTC state:', state)
+      if (state === 'connected') {
+        setTransferStatus('connected')
+      }
+    })
+  }, [setStateChangeHandler, setTransferStatus])
 
   // Handle incoming file meta and WebRTC signaling
   useEffect(() => {

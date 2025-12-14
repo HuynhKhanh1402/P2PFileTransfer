@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { useSocket } from '../hooks/useSocket'
-import { useWebRTC } from '../hooks/useWebRTC'
+import { useWebRTCContext } from '../context/WebRTCContext'
 import { formatFileSize, formatSpeed, formatTimeRemaining, getFileIcon } from '../utils/formatters'
 import { calculateSHA256FromBuffer, calculateSHA256 } from '../utils/crypto'
 import { reassembleChunks, downloadFile } from '../utils/fileUtils'
@@ -24,37 +24,63 @@ export default function TransferPage() {
   const [progress, setProgress] = useState(0)
   const [speed, setSpeed] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(null)
-  const [status, setStatus] = useState('connecting') // connecting, transferring, verifying, complete, error
+  const [status, setStatus] = useState('connecting')
   const [isPaused, setIsPaused] = useState(false)
   
-  // For receiver: store chunks
   const chunksRef = useRef([])
   const expectedChunksRef = useRef(0)
   const receivedBytesRef = useRef(0)
   const startTimeRef = useRef(null)
   const lastUpdateRef = useRef(Date.now())
   const lastBytesRef = useRef(0)
-
-  // File meta for receiver
+  const transferCompleteRef = useRef(false)
+  const initializedRef = useRef(false)
   const fileMetaRef = useRef(null)
+  const receivedChunksSetRef = useRef(new Set())
+  const pendingChunkIndexRef = useRef(null)
+
+  useEffect(() => {
+    if (role === 'receiver' && !initializedRef.current) {
+      initializedRef.current = true
+      chunksRef.current = []
+      receivedBytesRef.current = 0
+      expectedChunksRef.current = 0
+      fileMetaRef.current = null
+      transferCompleteRef.current = false
+      receivedChunksSetRef.current = new Set()
+      pendingChunkIndexRef.current = null
+      lastUpdateRef.current = Date.now()
+      lastBytesRef.current = 0
+    }
+  }, [])
 
   const handleMessage = useCallback((data) => {
-    // Handle binary data (file chunks)
     if (data instanceof ArrayBuffer) {
+      const chunkIndex = pendingChunkIndexRef.current
+      pendingChunkIndexRef.current = null
+      
+      if (chunkIndex === null) {
+        return
+      }
+      
+      if (receivedChunksSetRef.current.has(chunkIndex)) {
+        return
+      }
+      
+      receivedChunksSetRef.current.add(chunkIndex)
+      
       const chunk = {
-        index: chunksRef.current.length,
+        index: chunkIndex,
         data: new Uint8Array(data),
       }
       chunksRef.current.push(chunk)
       receivedBytesRef.current += data.byteLength
 
-      // Calculate progress and speed
       const totalSize = fileMetaRef.current?.size || fileMeta?.size || 1
       const currentProgress = Math.round((receivedBytesRef.current / totalSize) * 100)
       setProgress(currentProgress)
       setTransferProgress(currentProgress)
 
-      // Calculate speed
       const now = Date.now()
       const timeDiff = (now - lastUpdateRef.current) / 1000
       if (timeDiff >= 0.5) {
@@ -62,7 +88,6 @@ export default function TransferPage() {
         const currentSpeed = bytesDiff / timeDiff
         setSpeed(currentSpeed)
         
-        // Estimate time remaining
         const remainingBytes = totalSize - receivedBytesRef.current
         if (currentSpeed > 0) {
           setTimeRemaining(remainingBytes / currentSpeed)
@@ -74,21 +99,24 @@ export default function TransferPage() {
       return
     }
 
-    // Handle JSON messages
     try {
       const message = typeof data === 'string' ? JSON.parse(data) : data
       
       if (message.type === 'meta') {
-        console.log('Received file meta:', message)
+        if (fileMetaRef.current) {
+          return
+        }
         fileMetaRef.current = message
         expectedChunksRef.current = message.totalChunks
         startTimeRef.current = Date.now()
         setStatus('transferring')
       } else if (message.type === 'chunk') {
-        // Chunk header - next message will be the data
-        console.log(`Receiving chunk ${message.index + 1}/${expectedChunksRef.current}`)
+        if (!receivedChunksSetRef.current.has(message.index)) {
+          pendingChunkIndexRef.current = message.index
+        } else {
+          pendingChunkIndexRef.current = null
+        }
       } else if (message.type === 'complete') {
-        console.log('Transfer complete, verifying...')
         handleTransferComplete()
       }
     } catch (err) {
@@ -97,6 +125,11 @@ export default function TransferPage() {
   }, [fileMeta, setTransferProgress])
 
   const handleTransferComplete = async () => {
+    if (transferCompleteRef.current) {
+      return
+    }
+    transferCompleteRef.current = true
+    
     setStatus('verifying')
 
     try {
@@ -105,22 +138,15 @@ export default function TransferPage() {
         throw new Error('No file metadata')
       }
 
-      // Reassemble file
       const receivedFile = reassembleChunks(chunksRef.current, meta.name, meta.mimeType)
       
-      // Verify hash
       const receivedHash = await calculateSHA256(receivedFile)
-      const originalHash = meta.hash || fileHash
-      const isVerified = receivedHash === originalHash
-
-      console.log('Hash verification:', isVerified ? 'PASSED' : 'FAILED')
-      console.log('Expected:', originalHash)
-      console.log('Received:', receivedHash)
+      const originalHash = fileMeta?.hash || fileHash || meta.hash
+      const isVerified = originalHash && receivedHash === originalHash
 
       setReceivedFile(receivedFile)
       setHashVerified(isVerified)
       
-      // Notify sender
       emit('transfer-complete', { verified: isVerified })
 
       setStatus('complete')
@@ -131,26 +157,39 @@ export default function TransferPage() {
     }
   }
 
-  const handleStateChange = useCallback((state) => {
-    console.log('WebRTC state:', state)
-    if (state === 'connected') {
-      setStatus('transferring')
-    } else if (state === 'failed' || state === 'disconnected') {
-      setStatus('error')
-    }
-  }, [])
-
   const { 
     connectionState,
     sendFile: sendFileRTC,
-  } = useWebRTC({
-    onMessage: handleMessage,
-    onStateChange: handleStateChange,
-  })
+    setMessageHandler,
+    setStateChangeHandler,
+    isDataChannelReady,
+  } = useWebRTCContext()
 
-  // Sender: start sending file when connected
   useEffect(() => {
-    if (role === 'sender' && connectionState === 'connected' && file && status === 'connecting') {
+    if (role === 'receiver') {
+      setMessageHandler(handleMessage)
+    }
+    return () => {
+      if (role === 'receiver') {
+        setMessageHandler(null)
+      }
+    }
+  }, [role, handleMessage, setMessageHandler])
+
+  useEffect(() => {
+    setStateChangeHandler((state) => {
+      if (state === 'connected') {
+        setStatus('transferring')
+      } else if (state === 'failed' || state === 'disconnected') {
+        setStatus('error')
+      }
+    })
+  }, [setStateChangeHandler])
+
+  useEffect(() => {
+    const dataChannelReady = isDataChannelReady()
+    
+    if (role === 'sender' && (connectionState === 'connected' || dataChannelReady) && file && status === 'connecting') {
       setStatus('transferring')
       startTimeRef.current = Date.now()
 
@@ -161,7 +200,6 @@ export default function TransferPage() {
             setProgress(currentProgress)
             setTransferProgress(currentProgress)
 
-            // Calculate speed
             const now = Date.now()
             const elapsed = (now - startTimeRef.current) / 1000
             const bytesPerChunk = 64 * 1024
@@ -169,7 +207,6 @@ export default function TransferPage() {
             const currentSpeed = bytesSent / elapsed
             setSpeed(currentSpeed)
 
-            // Time remaining
             const remainingChunks = total - sent
             const remainingBytes = remainingChunks * bytesPerChunk
             if (currentSpeed > 0) {
@@ -186,12 +223,10 @@ export default function TransferPage() {
 
       sendFile()
     }
-  }, [role, connectionState, file, status, sendFileRTC, setTransferProgress])
+  }, [role, connectionState, file, status, sendFileRTC, setTransferProgress, isDataChannelReady])
 
-  // Handle transfer complete from peer
   useEffect(() => {
     const handleComplete = (data) => {
-      console.log('Peer signaled transfer complete:', data)
       if (role === 'sender') {
         setHashVerified(data.verified)
         navigate('/result')
@@ -207,7 +242,6 @@ export default function TransferPage() {
     navigate('/')
   }
 
-  // Redirect if no session
   useEffect(() => {
     if (!sessionCode) {
       navigate('/')
