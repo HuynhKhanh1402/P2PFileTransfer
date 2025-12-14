@@ -54,6 +54,14 @@ export default function TransferPage() {
     }
   }, [])
 
+  const cleanupChunks = useCallback(() => {
+    chunksRef.current = []
+    receivedChunksSetRef.current.clear()
+    receivedBytesRef.current = 0
+    fileMetaRef.current = null
+    pendingChunkIndexRef.current = null
+  }, [])
+
   const handleMessage = useCallback((data) => {
     if (data instanceof ArrayBuffer) {
       const chunkIndex = pendingChunkIndexRef.current
@@ -238,14 +246,6 @@ export default function TransferPage() {
     on('transfer-complete', handleComplete)
     return () => off('transfer-complete', handleComplete)
   }, [role, on, off, navigate, setHashVerified])
-
-  const cleanupChunks = useCallback(() => {
-    chunksRef.current = []
-    receivedChunksSetRef.current.clear()
-    receivedBytesRef.current = 0
-    fileMetaRef.current = null
-    pendingChunkIndexRef.current = null
-  }, [])
 
   const handleCancel = () => {
     cleanupChunks()
