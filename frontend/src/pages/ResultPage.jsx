@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { formatFileSize, formatHash, getFileIcon } from '../utils/formatters'
@@ -12,14 +12,31 @@ export default function ResultPage() {
     fileHash,
     receivedFile,
     hashVerified,
+    storageStrategyType,
     reset,
   } = useTransfer()
+
+  const downloadTriggeredRef = useRef(false)
 
   const displayFile = role === 'sender' ? file : receivedFile
   const displayMeta = role === 'sender' 
     ? (file ? { name: file.name, size: file.size, type: file.type } : null)
     : fileMeta
   const displayHash = role === 'sender' ? fileHash : fileMeta?.hash
+
+  // Download file function for receiver
+  const downloadFile = useCallback(() => {
+    if (!receivedFile) return
+    
+    const url = URL.createObjectURL(receivedFile)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = receivedFile.name || fileMeta?.name || 'downloaded-file'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [receivedFile, fileMeta])
 
   const handleSendAnother = () => {
     if (role === 'receiver') {
@@ -30,6 +47,17 @@ export default function ResultPage() {
       navigate('/')
     }
   }
+
+  // Auto-download file for receiver when transfer completes (except for filesystem strategy which saves directly)
+  useEffect(() => {
+    if (role === 'receiver' && receivedFile && !downloadTriggeredRef.current && storageStrategyType !== 'filesystem') {
+      downloadTriggeredRef.current = true
+      // Small delay to ensure UI is rendered first
+      setTimeout(() => {
+        downloadFile()
+      }, 500)
+    }
+  }, [role, receivedFile, storageStrategyType, downloadFile])
 
   // Redirect if no session data
   useEffect(() => {
@@ -113,6 +141,23 @@ export default function ResultPage() {
 
         {/* Actions */}
         <div className="px-6 pb-10 flex flex-col gap-3">
+          {/* Download button for receiver (only show if file is available and not using filesystem strategy) */}
+          {role === 'receiver' && receivedFile && storageStrategyType !== 'filesystem' && (
+            <button
+              onClick={downloadFile}
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl h-12 px-6 bg-green-600 hover:bg-green-700 transition-colors text-white text-base font-bold shadow-sm hover:shadow-md"
+            >
+              <span className="material-symbols-outlined text-xl">download</span>
+              Download File
+            </button>
+          )}
+          {/* Info for filesystem strategy */}
+          {role === 'receiver' && storageStrategyType === 'filesystem' && (
+            <div className="flex w-full items-center justify-center gap-2 rounded-xl h-12 px-6 bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
+              <span className="material-symbols-outlined text-xl">check_circle</span>
+              File saved to your selected location
+            </div>
+          )}
           <button
             onClick={handleSendAnother}
             className="flex w-full cursor-pointer items-center justify-center rounded-xl h-12 px-6 bg-primary hover:bg-primary-hover transition-colors text-text-main text-base font-bold shadow-sm hover:shadow-md"
