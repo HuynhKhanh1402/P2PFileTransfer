@@ -34,6 +34,7 @@ services:
     environment:
       - VITE_API_URL=http://localhost:3001
       - VITE_SOCKET_URL=http://localhost:3001
+      - VITE_ALLOWED_HOSTS=localhost,filetransfer.khanhhuynh.io.vn
     depends_on:
       - backend
     networks:
