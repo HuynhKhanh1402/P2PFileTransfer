@@ -422,6 +422,8 @@ export class IndexedDBStrategy {
     this.mimeType = ''
     this.totalChunks = 0
     this.chunksWritten = 0
+    this.writeQueue = Promise.resolve() // Queue to serialize write operations
+    this.pendingWrites = 0 // Track pending write operations
   }
 
   /**
@@ -438,6 +440,8 @@ export class IndexedDBStrategy {
     this.sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
     this.buffer = []
     this.chunksWritten = 0
+    this.writeQueue = Promise.resolve()
+    this.pendingWrites = 0
 
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(IndexedDBStrategy.DB_NAME, IndexedDBStrategy.DB_VERSION)
@@ -466,6 +470,7 @@ export class IndexedDBStrategy {
 
   /**
    * Write a chunk to buffer, flush to IndexedDB when buffer is full (Requirement 2.2)
+   * Uses a write queue to ensure sequential operations and prevent race conditions
    * @param {number} chunkIndex - Index of the chunk
    * @param {Uint8Array} data - Chunk data
    * @returns {Promise<void>}
@@ -479,18 +484,28 @@ export class IndexedDBStrategy {
     // This is important because WebRTC may reuse the underlying buffer
     const dataCopy = new Uint8Array(data)
 
-    // Add chunk to buffer
-    this.buffer.push({
-      id: `${this.sessionId}_${chunkIndex}`,
-      sessionId: this.sessionId,
-      index: chunkIndex,
-      data: dataCopy,
+    // Queue the write operation to ensure sequential execution
+    this.pendingWrites++
+    this.writeQueue = this.writeQueue.then(async () => {
+      try {
+        // Add chunk to buffer
+        this.buffer.push({
+          id: `${this.sessionId}_${chunkIndex}`,
+          sessionId: this.sessionId,
+          index: chunkIndex,
+          data: dataCopy,
+        })
+
+        // Flush buffer when it reaches BUFFER_SIZE
+        if (this.buffer.length >= IndexedDBStrategy.BUFFER_SIZE) {
+          await this._flushBuffer()
+        }
+      } finally {
+        this.pendingWrites--
+      }
     })
 
-    // Flush buffer when it reaches BUFFER_SIZE
-    if (this.buffer.length >= IndexedDBStrategy.BUFFER_SIZE) {
-      await this._flushBuffer()
-    }
+    return this.writeQueue
   }
 
   /**
@@ -500,13 +515,15 @@ export class IndexedDBStrategy {
   async _flushBuffer() {
     if (this.buffer.length === 0) return
 
+    const chunksToWrite = [...this.buffer]
+    this.buffer = []
+
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([IndexedDBStrategy.STORE_NAME], 'readwrite')
       const store = transaction.objectStore(IndexedDBStrategy.STORE_NAME)
 
       transaction.oncomplete = () => {
-        this.chunksWritten += this.buffer.length
-        this.buffer = []
+        this.chunksWritten += chunksToWrite.length
         resolve()
       }
 
@@ -515,7 +532,7 @@ export class IndexedDBStrategy {
       }
 
       // Write all buffered chunks
-      for (const chunk of this.buffer) {
+      for (const chunk of chunksToWrite) {
         store.put(chunk)
       }
     })
@@ -530,7 +547,12 @@ export class IndexedDBStrategy {
       throw new Error('IndexedDBStrategy not initialized')
     }
 
+    // Wait for all pending write operations to complete
+    console.log(`[IndexedDB] Finalize: waiting for write queue to complete, pendingWrites=${this.pendingWrites}`)
+    await this.writeQueue
+
     // Flush any remaining buffered chunks
+    console.log(`[IndexedDB] Finalize: flushing remaining ${this.buffer.length} buffered chunks`)
     await this._flushBuffer()
 
     // Retrieve all chunks from IndexedDB and reassemble
@@ -647,6 +669,13 @@ export class IndexedDBStrategy {
    */
   async cleanup() {
     if (!this.db) return
+
+    // Wait for any pending writes to complete
+    try {
+      await this.writeQueue
+    } catch {
+      // Ignore errors from pending writes during cleanup
+    }
 
     // Clear buffer
     this.buffer = []
