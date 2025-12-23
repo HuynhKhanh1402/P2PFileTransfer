@@ -10,6 +10,7 @@ export default function HomePage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [hash, setHash] = useState(null)
   const [isHashing, setIsHashing] = useState(false)
+  const [hashProgress, setHashProgress] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [isCreatingSession, setIsCreatingSession] = useState(false)
   const [error, setError] = useState(null)
@@ -20,9 +21,12 @@ export default function HomePage() {
     setError(null)
     setHash(null)
     setIsHashing(true)
+    setHashProgress(0)
 
     try {
-      const fileHash = await calculateSHA256(file)
+      const fileHash = await calculateSHA256(file, (progress) => {
+        setHashProgress(progress)
+      })
       setHash(fileHash)
     } catch (err) {
       console.error('Error calculating hash:', err)
@@ -33,6 +37,7 @@ export default function HomePage() {
       }
     } finally {
       setIsHashing(false)
+      setHashProgress(100)
     }
   }, [])
 
@@ -205,7 +210,7 @@ export default function HomePage() {
                     {isHashing ? (
                       <span className="flex items-center gap-1 text-xs">
                         <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
-                        Calculating hash...
+                        Calculating hash... {hashProgress}%
                       </span>
                     ) : hash ? (
                       <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500 truncate max-w-[200px]">
