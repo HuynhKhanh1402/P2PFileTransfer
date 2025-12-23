@@ -98,6 +98,7 @@ export default function TransferPage() {
       transferCompleteRef.current = false // Critical: reset this on every mount
       receivedChunksSetRef.current = new Set()
       pendingChunkIndexRef.current = null
+      pendingArrayBuffersRef.current = [] // Reset queued ArrayBuffers
       lastUpdateRef.current = Date.now()
       lastBytesRef.current = 0
       console.log(`[TransferPage] Receiver initialized, transferCompleteRef reset to false`)
@@ -113,6 +114,7 @@ export default function TransferPage() {
     receivedBytesRef.current = 0
     fileMetaRef.current = null
     pendingChunkIndexRef.current = null
+    pendingArrayBuffersRef.current = [] // Clear queued ArrayBuffers
     
     // Cleanup storage strategy if it exists
     const strategy = storageStrategyRef.current
@@ -128,6 +130,9 @@ export default function TransferPage() {
     }
   }, [])
 
+  // Queue to store ArrayBuffer data that arrives before its chunk header
+  const pendingArrayBuffersRef = useRef([])
+
   const handleMessage = useCallback(async (data) => {
     // Skip processing if transfer is already complete
     if (transferCompleteRef.current) {
@@ -137,14 +142,18 @@ export default function TransferPage() {
 
     if (data instanceof ArrayBuffer) {
       const chunkIndex = pendingChunkIndexRef.current
-      pendingChunkIndexRef.current = null
       
-      console.log(`[TransferPage] Received ArrayBuffer chunk, index=${chunkIndex}, size=${data.byteLength}`)
+      console.log(`[TransferPage] Received ArrayBuffer chunk, pendingIndex=${chunkIndex}, size=${data.byteLength}`)
       
+      // If no pending chunk index, queue the ArrayBuffer for later processing
+      // This handles race condition on mobile where ArrayBuffer arrives before chunk header
       if (chunkIndex === null) {
-        console.log(`[TransferPage] No pending chunk index, skipping`)
+        console.log(`[TransferPage] No pending chunk index, queuing ArrayBuffer`)
+        pendingArrayBuffersRef.current.push(data)
         return
       }
+      
+      pendingChunkIndexRef.current = null
       
       if (receivedChunksSetRef.current.has(chunkIndex)) {
         console.log(`[TransferPage] Chunk ${chunkIndex} already received, skipping`)
@@ -187,8 +196,10 @@ export default function TransferPage() {
       
       receivedBytesRef.current += data.byteLength
 
-      const totalSize = fileMetaRef.current?.size || fileMeta?.size || 1
-      const currentProgress = Math.round((receivedBytesRef.current / totalSize) * 100)
+      // Use fileMeta from context as primary source (set via socket before transfer starts)
+      // Fall back to fileMetaRef (set via WebRTC data channel) if context doesn't have it
+      const totalSize = fileMeta?.size || fileMetaRef.current?.size || 1
+      const currentProgress = Math.min(Math.round((receivedBytesRef.current / totalSize) * 100), 100)
       setProgress(currentProgress)
       setTransferProgress(currentProgress)
 
@@ -223,11 +234,19 @@ export default function TransferPage() {
         expectedChunksRef.current = message.totalChunks
         startTimeRef.current = Date.now()
         setStatus('transferring')
-        console.log(`[TransferPage] Meta set, expecting ${message.totalChunks} chunks`)
+        console.log(`[TransferPage] Meta set, expecting ${message.totalChunks} chunks, size=${message.size}`)
       } else if (message.type === 'chunk') {
         if (!receivedChunksSetRef.current.has(message.index)) {
           pendingChunkIndexRef.current = message.index
           console.log(`[TransferPage] Pending chunk index set to ${message.index}`)
+          
+          // Process any queued ArrayBuffers that arrived before this chunk header
+          if (pendingArrayBuffersRef.current.length > 0) {
+            const queuedBuffer = pendingArrayBuffersRef.current.shift()
+            console.log(`[TransferPage] Processing queued ArrayBuffer for chunk ${message.index}`)
+            // Recursively call handleMessage to process the queued ArrayBuffer
+            await handleMessage(queuedBuffer)
+          }
         } else {
           pendingChunkIndexRef.current = null
         }
