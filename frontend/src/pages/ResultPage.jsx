@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { formatFileSize, formatHash, getFileIcon } from '../utils/formatters'
-import { downloadFile } from '../utils/fileUtils'
 
 export default function ResultPage() {
   const navigate = useNavigate()
@@ -22,15 +21,14 @@ export default function ResultPage() {
     : fileMeta
   const displayHash = role === 'sender' ? fileHash : fileMeta?.hash
 
-  const handleDownload = () => {
-    if (receivedFile) {
-      downloadFile(receivedFile)
-    }
-  }
-
   const handleSendAnother = () => {
-    reset()
-    navigate('/')
+    if (role === 'receiver') {
+      reset()
+      navigate('/receive')
+    } else {
+      reset()
+      navigate('/')
+    }
   }
 
   // Redirect if no session data
@@ -115,22 +113,9 @@ export default function ResultPage() {
 
         {/* Actions */}
         <div className="px-6 pb-10 flex flex-col gap-3">
-          {role === 'receiver' && isSuccess && (
-            <button
-              onClick={handleDownload}
-              className="flex w-full cursor-pointer items-center justify-center rounded-xl h-12 px-6 bg-primary hover:bg-primary-hover transition-colors text-text-main text-base font-bold shadow-sm hover:shadow-md"
-            >
-              <span className="material-symbols-outlined mr-2 text-[20px]">download</span>
-              Download File
-            </button>
-          )}
           <button
             onClick={handleSendAnother}
-            className={`flex w-full cursor-pointer items-center justify-center rounded-xl h-12 px-6 transition-all text-sm font-medium ${
-              role === 'receiver' && isSuccess
-                ? 'bg-transparent hover:bg-background-light border border-transparent hover:border-gray-200 text-text-secondary'
-                : 'bg-primary hover:bg-primary-hover text-text-main font-bold shadow-sm hover:shadow-md'
-            }`}
+            className="flex w-full cursor-pointer items-center justify-center rounded-xl h-12 px-6 bg-primary hover:bg-primary-hover transition-colors text-text-main text-base font-bold shadow-sm hover:shadow-md"
           >
             {role === 'sender' ? 'Send Another File' : 'Receive Another File'}
           </button>
