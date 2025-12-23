@@ -9,8 +9,6 @@ const RTC_CONFIG = {
 }
 
 const CHUNK_SIZE = 64 * 1024 // 64KB
-const BUFFER_THRESHOLD = 1024 * 1024 // 1MB - higher threshold for better throughput
-const BUFFER_LOW_THRESHOLD = 256 * 1024 // 256KB - resume sending when buffer drops to this
 
 const WebRTCContext = createContext(null)
 
@@ -209,29 +207,6 @@ export function WebRTCProvider({ children }) {
     }
     channel.send(JSON.stringify(meta))
 
-    // Helper function to wait for buffer to drain
-    const waitForBuffer = () => {
-      return new Promise((resolve) => {
-        const check = () => {
-          if (channel.bufferedAmount <= BUFFER_LOW_THRESHOLD) {
-            resolve()
-          } else {
-            // Use bufferedamountlow event if available, otherwise poll
-            if (channel.onbufferedamountlow !== undefined) {
-              channel.bufferedAmountLowThreshold = BUFFER_LOW_THRESHOLD
-              channel.onbufferedamountlow = () => {
-                channel.onbufferedamountlow = null
-                resolve()
-              }
-            } else {
-              setTimeout(check, 5)
-            }
-          }
-        }
-        check()
-      })
-    }
-
     // Read and send chunks
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE
@@ -239,9 +214,9 @@ export function WebRTCProvider({ children }) {
       const chunk = file.slice(start, end)
       const arrayBuffer = await chunk.arrayBuffer()
 
-      // Wait if buffer is full - use higher threshold for better throughput
-      if (channel.bufferedAmount > BUFFER_THRESHOLD) {
-        await waitForBuffer()
+      // Wait if buffer is full
+      while (channel.bufferedAmount > CHUNK_SIZE * 10) {
+        await new Promise(resolve => setTimeout(resolve, 10))
       }
 
       // Send chunk header
