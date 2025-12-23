@@ -197,6 +197,8 @@ export function WebRTCProvider({ children }) {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
     let sentChunks = 0
 
+    console.log(`[WebRTC] Starting file send: ${file.name}, size=${file.size}, totalChunks=${totalChunks}`)
+
     // Send file metadata first
     const meta = {
       type: 'meta',
@@ -206,6 +208,14 @@ export function WebRTCProvider({ children }) {
       totalChunks,
     }
     channel.send(JSON.stringify(meta))
+
+    // Log first and last bytes of original file for comparison
+    const firstBlob = file.slice(0, 16)
+    const lastBlob = file.slice(-16)
+    const firstBytes = new Uint8Array(await firstBlob.arrayBuffer())
+    const lastBytes = new Uint8Array(await lastBlob.arrayBuffer())
+    console.log(`[WebRTC] Original file first 16 bytes: ${Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' ')}`)
+    console.log(`[WebRTC] Original file last 16 bytes: ${Array.from(lastBytes).map(b => b.toString(16).padStart(2, '0')).join(' ')}`)
 
     // Read and send chunks
     for (let i = 0; i < totalChunks; i++) {

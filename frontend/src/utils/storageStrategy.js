@@ -536,8 +536,48 @@ export class IndexedDBStrategy {
     // Retrieve all chunks from IndexedDB and reassemble
     const chunks = await this._getAllChunks()
     
+    console.log(`[IndexedDB] Finalize: retrieved ${chunks.length} chunks from IndexedDB`)
+    
     // Sort chunks by index
     chunks.sort((a, b) => a.index - b.index)
+
+    // Log chunk info for debugging
+    let totalSize = 0
+    const chunkSizes = []
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]
+      const data = chunk.data
+      let size = 0
+      if (data instanceof Uint8Array) {
+        size = data.byteLength
+      } else if (data instanceof ArrayBuffer) {
+        size = data.byteLength
+      } else if (data && data.buffer instanceof ArrayBuffer) {
+        size = data.byteLength
+      } else if (data && data.length !== undefined) {
+        size = data.length
+      }
+      totalSize += size
+      chunkSizes.push({ index: chunk.index, size, type: data?.constructor?.name || typeof data })
+    }
+    console.log(`[IndexedDB] Total size from chunks: ${totalSize}, expected: ${this.fileSize}`)
+    console.log(`[IndexedDB] First 5 chunks:`, chunkSizes.slice(0, 5))
+    console.log(`[IndexedDB] Last 5 chunks:`, chunkSizes.slice(-5))
+    
+    // Check for missing chunks
+    const expectedChunks = Math.ceil(this.fileSize / (64 * 1024))
+    if (chunks.length !== expectedChunks) {
+      console.warn(`[IndexedDB] Chunk count mismatch! Expected ${expectedChunks}, got ${chunks.length}`)
+    }
+    
+    // Check for duplicate or out-of-order chunks
+    const seenIndices = new Set()
+    for (const chunk of chunks) {
+      if (seenIndices.has(chunk.index)) {
+        console.warn(`[IndexedDB] Duplicate chunk index: ${chunk.index}`)
+      }
+      seenIndices.add(chunk.index)
+    }
 
     // Combine chunks into a single Blob/File
     // Note: IndexedDB may return data as ArrayBuffer instead of Uint8Array
@@ -556,7 +596,23 @@ export class IndexedDBStrategy {
       // Fallback: assume it's already a valid BlobPart
       return data
     })
+    
+    // Log first and last chunk bytes for debugging
+    if (blobParts.length > 0) {
+      const firstChunk = blobParts[0]
+      const lastChunk = blobParts[blobParts.length - 1]
+      if (firstChunk instanceof Uint8Array) {
+        const first16 = Array.from(firstChunk.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        console.log(`[IndexedDB] First chunk first 16 bytes: ${first16}`)
+      }
+      if (lastChunk instanceof Uint8Array) {
+        const last16 = Array.from(lastChunk.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        console.log(`[IndexedDB] Last chunk last 16 bytes: ${last16}`)
+      }
+    }
+    
     const file = new File(blobParts, this.fileName, { type: this.mimeType })
+    console.log(`[IndexedDB] Created file: name=${file.name}, size=${file.size}, type=${file.type}`)
 
     return {
       type: 'indexeddb',

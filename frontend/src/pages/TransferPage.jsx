@@ -257,11 +257,14 @@ export default function TransferPage() {
         throw new Error('No file metadata')
       }
 
+      console.log(`[TransferPage] Finalizing transfer, meta:`, meta)
+
       let receivedFile
       
       // Use storage strategy to finalize if available
       if (strategy) {
         try {
+          console.log(`[TransferPage] Using strategy ${strategy.type} to finalize`)
           const result = await strategy.finalize()
           
           // For filesystem strategy, file is already saved to disk
@@ -280,6 +283,7 @@ export default function TransferPage() {
           
           // For indexeddb and memory strategies, we get a File object
           receivedFile = result.file
+          console.log(`[TransferPage] Finalized file: name=${receivedFile.name}, size=${receivedFile.size}, type=${receivedFile.type}`)
         } catch (error) {
           // Log detailed error information (Requirement 7.4)
           logStorageError('finalize', error, meta.size, strategy?.type)
@@ -293,8 +297,13 @@ export default function TransferPage() {
         receivedFile = reassembleChunks(chunksRef.current, meta.name, meta.mimeType)
       }
       
+      console.log(`[TransferPage] Calculating hash for received file...`)
       const receivedHash = await calculateSHA256(receivedFile)
       const originalHash = fileMeta?.hash || fileHash || meta.hash
+      console.log(`[TransferPage] Hash comparison:`)
+      console.log(`[TransferPage]   Original hash: ${originalHash}`)
+      console.log(`[TransferPage]   Received hash: ${receivedHash}`)
+      console.log(`[TransferPage]   Match: ${originalHash === receivedHash}`)
       const isVerified = originalHash && receivedHash === originalHash
 
       setReceivedFile(receivedFile)

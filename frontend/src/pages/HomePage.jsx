@@ -25,9 +25,11 @@ export default function HomePage() {
     setHashProgress(0)
 
     try {
+      console.log(`[HomePage] Starting hash calculation for file: ${file.name}, size: ${file.size}`)
       const fileHash = await calculateSHA256(file, (progress) => {
         setHashProgress(progress)
       })
+      console.log(`[HomePage] Hash calculated: ${fileHash}`)
       setHash(fileHash)
     } catch (err) {
       console.error('Error calculating hash:', err)
