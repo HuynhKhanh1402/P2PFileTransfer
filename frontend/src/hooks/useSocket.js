@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { io } from 'socket.io-client'
 
-const SOCKET_URL = 'http://localhost:3001'
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001'
 
 // Create a single socket instance to be shared across components
 let socketInstance = null

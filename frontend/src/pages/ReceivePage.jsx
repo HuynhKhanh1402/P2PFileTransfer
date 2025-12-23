@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { useSocket } from '../hooks/useSocket'
+import { checkSession } from '../services/api'
 
 export default function ReceivePage() {
   const navigate = useNavigate()
@@ -74,8 +75,7 @@ export default function ReceivePage() {
 
     try {
       // Check if session exists
-      const response = await fetch(`http://localhost:3001/api/session/${fullCode}`)
-      const data = await response.json()
+      const data = await checkSession(fullCode)
 
       if (!data.exists) {
         setError('Session not found. Please check your code.')

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { calculateSHA256 } from '../utils/crypto'
 import { formatFileSize, formatHash, getFileIcon } from '../utils/formatters'
+import { createSession } from '../services/api'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -75,16 +76,7 @@ export default function HomePage() {
     setError(null)
 
     try {
-      const response = await fetch('http://localhost:3001/api/create-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to create session')
-      }
-
-      const data = await response.json()
+      const data = await createSession()
 
       // Set global state
       setFile(selectedFile)
