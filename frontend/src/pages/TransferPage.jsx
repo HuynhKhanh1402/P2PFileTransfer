@@ -425,64 +425,64 @@ export default function TransferPage() {
   const displayMeta = fileMetaRef.current || fileMeta || (file ? { name: file.name, size: file.size, type: file.type } : null)
 
   return (
-    <div className="flex-1 flex justify-center py-8 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-3xl flex flex-col gap-8">
+    <div className="flex-1 flex justify-center py-4 sm:py-8 px-3 sm:px-6 lg:px-8">
+      <div className="w-full max-w-3xl flex flex-col gap-4 sm:gap-8">
         {/* Page Heading & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl sm:text-4xl font-black leading-tight tracking-tight">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
+          <div className="flex flex-col gap-1 sm:gap-2 min-w-0">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black leading-tight tracking-tight truncate">
               {role === 'sender' ? 'Sending Files' : 'Receiving Files'}
             </h1>
             <div className="flex items-center gap-2 text-text-secondary">
-              <span className="material-symbols-outlined text-lg animate-pulse text-primary">lock</span>
-              <p className="text-base font-medium">Secure P2P Connection Established</p>
+              <span className="material-symbols-outlined text-base sm:text-lg animate-pulse text-primary shrink-0">lock</span>
+              <p className="text-sm sm:text-base font-medium truncate">Secure P2P Connection</p>
             </div>
           </div>
           <button
             onClick={handleCancel}
-            className="group flex items-center justify-center h-10 px-5 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-bold text-sm"
+            className="group flex items-center justify-center h-9 sm:h-10 px-4 sm:px-5 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition-colors font-bold text-xs sm:text-sm shrink-0"
           >
-            <span className="material-symbols-outlined mr-2 text-lg group-hover:rotate-90 transition-transform">close</span>
-            Cancel Transfer
+            <span className="material-symbols-outlined mr-1.5 sm:mr-2 text-base sm:text-lg group-hover:rotate-90 transition-transform">close</span>
+            Cancel
           </button>
         </div>
 
         {/* Central Transfer Card */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
           {/* File Preview Section */}
-          <div className="p-6 sm:p-8 border-b border-gray-100">
-            <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+          <div className="p-4 sm:p-6 lg:p-8 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center">
               {/* File Icon/Preview */}
               <div className="relative group shrink-0">
-                <div className="size-20 sm:size-24 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-5xl text-primary">
+                <div className="size-16 sm:size-20 lg:size-24 rounded-xl sm:rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl sm:text-4xl lg:text-5xl text-primary">
                     {displayMeta ? getFileIcon(displayMeta.type) : 'description'}
                   </span>
                 </div>
                 {status === 'complete' && (
-                  <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-1 rounded-full border-4 border-white flex items-center justify-center">
-                    <span className="material-symbols-outlined text-xs font-bold">check</span>
+                  <div className="absolute -bottom-1.5 -right-1.5 sm:-bottom-2 sm:-right-2 bg-green-500 text-white p-0.5 sm:p-1 rounded-full border-2 sm:border-4 border-white flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[10px] sm:text-xs font-bold">check</span>
                   </div>
                 )}
               </div>
 
               {/* File Details */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-xl sm:text-2xl font-bold truncate mb-1">
+              <div className="flex-1 min-w-0 w-full sm:w-auto">
+                <h3 className="text-base sm:text-xl lg:text-2xl font-bold truncate mb-1" title={displayMeta?.name}>
                   {displayMeta?.name || 'Unknown file'}
                 </h3>
-                <p className="text-text-secondary font-medium">
-                  {displayMeta?.type || 'File'} - {displayMeta ? formatFileSize(displayMeta.size) : '0 B'} Total
+                <p className="text-text-secondary font-medium text-sm sm:text-base truncate">
+                  {displayMeta?.type || 'File'} - {displayMeta ? formatFileSize(displayMeta.size) : '0 B'}
                 </p>
               </div>
 
               {/* Status Badge */}
-              <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+              <div className={`px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                 status === 'complete' ? 'bg-green-100 text-green-700' :
                 status === 'error' ? 'bg-red-100 text-red-700' :
                 'bg-primary/20 text-yellow-700'
               }`}>
-                <span className="size-2 rounded-full bg-current animate-pulse"></span>
+                <span className="size-1.5 sm:size-2 rounded-full bg-current animate-pulse"></span>
                 {status === 'connecting' && 'Connecting'}
                 {status === 'transferring' && (role === 'sender' ? 'Uploading' : 'Downloading')}
                 {status === 'verifying' && 'Verifying'}
@@ -493,11 +493,11 @@ export default function TransferPage() {
           </div>
 
           {/* Progress Section */}
-          <div className="p-6 sm:p-8 flex flex-col gap-6">
+          <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-4 sm:gap-6">
             <div className="flex justify-between items-baseline">
-              <div className="flex flex-col">
-                <span className="text-6xl font-black tabular-nums tracking-tighter text-text-main">{progress}%</span>
-                <span className="text-sm font-medium text-text-secondary mt-1">
+              <div className="flex flex-col min-w-0">
+                <span className="text-4xl sm:text-5xl lg:text-6xl font-black tabular-nums tracking-tighter text-text-main">{progress}%</span>
+                <span className="text-xs sm:text-sm font-medium text-text-secondary mt-1 truncate">
                   {role === 'sender' 
                     ? `${formatFileSize(Math.round((progress / 100) * (displayMeta?.size || 0)))} uploaded`
                     : `${formatFileSize(receivedBytesRef.current)} received`
@@ -506,17 +506,17 @@ export default function TransferPage() {
               </div>
               {/* Pause button - demo only */}
               <div 
-                className="hidden sm:flex size-12 rounded-full bg-gray-100 items-center justify-center hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer"
+                className="hidden sm:flex size-10 lg:size-12 rounded-full bg-gray-100 items-center justify-center hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer shrink-0"
                 onClick={() => setIsPaused(!isPaused)}
               >
-                <span className="material-symbols-outlined">
+                <span className="material-symbols-outlined text-xl lg:text-2xl">
                   {isPaused ? 'play_arrow' : 'pause'}
                 </span>
               </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-3 sm:h-4 w-full bg-gray-100 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-primary rounded-full relative overflow-hidden transition-all duration-300 ease-out"
                 style={{ width: `${progress}%` }}
@@ -528,61 +528,61 @@ export default function TransferPage() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-gray-100 divide-x divide-gray-100">
-            <div className="p-6 flex flex-col gap-1 items-center sm:items-start">
-              <div className="flex items-center gap-2 text-text-secondary mb-1">
-                <span className="material-symbols-outlined text-lg">speed</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Speed</span>
+          <div className="grid grid-cols-2 lg:grid-cols-4 border-t border-gray-100">
+            <div className="p-3 sm:p-4 lg:p-6 flex flex-col gap-0.5 sm:gap-1 items-center sm:items-start border-b lg:border-b-0 border-r border-gray-100">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-text-secondary mb-0.5 sm:mb-1">
+                <span className="material-symbols-outlined text-base sm:text-lg">speed</span>
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide">Speed</span>
               </div>
-              <p className="text-xl font-bold tabular-nums">{formatSpeed(speed)}</p>
+              <p className="text-base sm:text-lg lg:text-xl font-bold tabular-nums truncate max-w-full">{formatSpeed(speed)}</p>
             </div>
-            <div className="p-6 flex flex-col gap-1 items-center sm:items-start">
-              <div className="flex items-center gap-2 text-text-secondary mb-1">
-                <span className="material-symbols-outlined text-lg">timer</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Time Left</span>
+            <div className="p-3 sm:p-4 lg:p-6 flex flex-col gap-0.5 sm:gap-1 items-center sm:items-start border-b lg:border-b-0 lg:border-r border-gray-100">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-text-secondary mb-0.5 sm:mb-1">
+                <span className="material-symbols-outlined text-base sm:text-lg">timer</span>
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide">Time Left</span>
               </div>
-              <p className="text-xl font-bold tabular-nums">
+              <p className="text-base sm:text-lg lg:text-xl font-bold tabular-nums truncate max-w-full">
                 {timeRemaining !== null ? formatTimeRemaining(timeRemaining) : '--'}
               </p>
             </div>
-            <div className="p-6 flex flex-col gap-1 items-center sm:items-start">
-              <div className="flex items-center gap-2 text-text-secondary mb-1">
-                <span className="material-symbols-outlined text-lg">hub</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Connection</span>
+            <div className="p-3 sm:p-4 lg:p-6 flex flex-col gap-0.5 sm:gap-1 items-center sm:items-start border-r border-gray-100">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-text-secondary mb-0.5 sm:mb-1">
+                <span className="material-symbols-outlined text-base sm:text-lg">hub</span>
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide">Connection</span>
               </div>
-              <p className="text-xl font-bold tabular-nums">P2P Direct</p>
+              <p className="text-base sm:text-lg lg:text-xl font-bold tabular-nums">P2P</p>
             </div>
-            <div className="p-6 flex flex-col gap-1 items-center sm:items-start">
-              <div className="flex items-center gap-2 text-text-secondary mb-1">
-                <span className="material-symbols-outlined text-lg">security</span>
-                <span className="text-xs font-bold uppercase tracking-wide">Encryption</span>
+            <div className="p-3 sm:p-4 lg:p-6 flex flex-col gap-0.5 sm:gap-1 items-center sm:items-start">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-text-secondary mb-0.5 sm:mb-1">
+                <span className="material-symbols-outlined text-base sm:text-lg">security</span>
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide">Encryption</span>
               </div>
-              <p className="text-xl font-bold tabular-nums">AES-256</p>
+              <p className="text-base sm:text-lg lg:text-xl font-bold tabular-nums">AES-256</p>
             </div>
           </div>
         </div>
 
         {/* Additional Info */}
-        <div className="bg-primary/5 rounded-xl p-4 flex items-start gap-4 border border-primary/10">
-          <span className="material-symbols-outlined text-primary mt-0.5">info</span>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-text-main">Tips for faster transfers</p>
-            <p className="text-sm text-text-secondary mt-1">
-              Keep this tab open for the best performance. Closing the tab will pause the transfer until you return.
+        <div className="bg-primary/5 rounded-xl p-3 sm:p-4 flex items-start gap-3 sm:gap-4 border border-primary/10">
+          <span className="material-symbols-outlined text-primary mt-0.5 shrink-0 text-lg sm:text-xl">info</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs sm:text-sm font-medium text-text-main">Tips for faster transfers</p>
+            <p className="text-xs sm:text-sm text-text-secondary mt-0.5 sm:mt-1">
+              Keep this tab open. Closing will pause the transfer.
             </p>
           </div>
         </div>
 
         {/* Storage Method Display (Requirements 5.1, 5.2, 5.3, 5.4) */}
         {role === 'receiver' && storageStrategyType && (
-          <div className="bg-blue-50 rounded-xl p-4 flex items-start gap-4 border border-blue-100">
-            <span className="material-symbols-outlined text-blue-500 mt-0.5">
+          <div className="bg-blue-50 rounded-xl p-3 sm:p-4 flex items-start gap-3 sm:gap-4 border border-blue-100">
+            <span className="material-symbols-outlined text-blue-500 mt-0.5 shrink-0 text-lg sm:text-xl">
               {storageStrategyType === 'filesystem' ? 'folder' : 
                storageStrategyType === 'indexeddb' ? 'database' : 'memory'}
             </span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-blue-800">Storage Method</p>
-              <p className="text-sm text-blue-600 mt-1">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-blue-800">Storage Method</p>
+              <p className="text-xs sm:text-sm text-blue-600 mt-0.5 sm:mt-1 break-words">
                 {getStorageMessage(storageStrategyType)}
               </p>
             </div>
