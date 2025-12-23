@@ -15,6 +15,9 @@ export function TransferProvider({ children }) {
   const [error, setError] = useState(null)
   const [receivedFile, setReceivedFile] = useState(null)
   const [hashVerified, setHashVerified] = useState(null)
+  // Storage strategy state for receiver
+  const [storageStrategy, setStorageStrategy] = useState(null)
+  const [storageStrategyType, setStorageStrategyType] = useState(null)
 
   const reset = useCallback(() => {
     setFile(null)
@@ -29,6 +32,8 @@ export function TransferProvider({ children }) {
     setError(null)
     setReceivedFile(null)
     setHashVerified(null)
+    setStorageStrategy(null)
+    setStorageStrategyType(null)
   }, [])
 
   const value = {
@@ -56,6 +61,10 @@ export function TransferProvider({ children }) {
     setReceivedFile,
     hashVerified,
     setHashVerified,
+    storageStrategy,
+    setStorageStrategy,
+    storageStrategyType,
+    setStorageStrategyType,
     reset,
   }
 

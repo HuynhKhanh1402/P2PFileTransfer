@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useRef, useState, useCallback } from 'react'
 
 const RTC_CONFIG = {
   iceServers: [
@@ -20,6 +20,7 @@ export function WebRTCProvider({ children }) {
   const [connectionState, setConnectionState] = useState('new')
   const messageSeqRef = useRef(0)
   const processedMessagesRef = useRef(new Set())
+  const messageQueueRef = useRef([]) // Queue for messages received before handler is set
 
   const updateState = useCallback((state) => {
     setConnectionState(state)
@@ -27,7 +28,19 @@ export function WebRTCProvider({ children }) {
   }, [])
 
   const setMessageHandler = useCallback((handler) => {
+    console.log(`[WebRTC] setMessageHandler called, handler=${handler ? 'function' : 'null'}, queueLength=${messageQueueRef.current.length}`)
     messageHandlerRef.current = handler
+    
+    // Process any queued messages when handler is set
+    if (handler && messageQueueRef.current.length > 0) {
+      console.log(`[WebRTC] Processing ${messageQueueRef.current.length} queued messages`)
+      const queuedMessages = [...messageQueueRef.current]
+      messageQueueRef.current = []
+      queuedMessages.forEach((data, index) => {
+        console.log(`[WebRTC] Processing queued message ${index + 1}/${queuedMessages.length}`)
+        handler(data)
+      })
+    }
   }, [])
 
   const setStateChangeHandler = useCallback((handler) => {
@@ -80,6 +93,7 @@ export function WebRTCProvider({ children }) {
       const seq = messageSeqRef.current++
       
       if (processedMessagesRef.current.has(seq)) {
+        console.log(`[WebRTC] Duplicate message seq=${seq}, skipping`)
         return
       }
       processedMessagesRef.current.add(seq)
@@ -89,7 +103,18 @@ export function WebRTCProvider({ children }) {
         toDelete.forEach(s => processedMessagesRef.current.delete(s))
       }
       
-      messageHandlerRef.current?.(event.data)
+      // Log message type for debugging
+      const isArrayBuffer = event.data instanceof ArrayBuffer
+      console.log(`[WebRTC] onmessage seq=${seq}, isArrayBuffer=${isArrayBuffer}, handlerSet=${!!messageHandlerRef.current}, queueLength=${messageQueueRef.current.length}`)
+      
+      // If handler is not set yet, queue the message
+      if (!messageHandlerRef.current) {
+        console.log(`[WebRTC] Handler not set, queuing message seq=${seq}`)
+        messageQueueRef.current.push(event.data)
+        return
+      }
+      
+      messageHandlerRef.current(event.data)
     }
 
     dataChannelRef.current = channel
@@ -228,6 +253,7 @@ export function WebRTCProvider({ children }) {
   const reset = useCallback(() => {
     close()
     setConnectionState('new')
+    messageQueueRef.current = [] // Clear message queue on reset
   }, [close])
 
   // Check if data channel is ready

@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTransfer } from '../context/TransferContext'
 import { useSocket } from '../hooks/useSocket'
 import { useWebRTCContext } from '../context/WebRTCContext'
-import { formatFileSize, formatHash, getFileIcon } from '../utils/formatters'
+import { formatFileSize, getFileIcon } from '../utils/formatters'
+import { detectBestStrategy, createStrategy, getBrowserInfo } from '../utils/storageStrategy'
 
 export default function ConfirmPage() {
   const navigate = useNavigate()
@@ -13,14 +14,22 @@ export default function ConfirmPage() {
     fileMeta, 
     setFileMeta,
     setTransferStatus,
+    setStorageStrategy,
+    setStorageStrategyType,
   } = useTransfer()
   
   const { socket, emit, on, off } = useSocket()
   const [isAccepting, setIsAccepting] = useState(false)
+  const [warningAcknowledged, setWarningAcknowledged] = useState(false)
+
+  // Detect storage strategy and warnings based on file size
+  const storageInfo = useMemo(() => {
+    if (!fileMeta?.size) return null
+    return detectBestStrategy(fileMeta.size)
+  }, [fileMeta?.size])
 
   const { 
     createAnswer, 
-    setRemoteDescription,
     setStateChangeHandler,
   } = useWebRTCContext()
 
@@ -62,8 +71,71 @@ export default function ConfirmPage() {
     }
   }, [socket, on, off, emit, createAnswer, setFileMeta])
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     setIsAccepting(true)
+    
+    // Initialize storage strategy with fallback chain (Requirements 7.1, 7.2)
+    const strategyResult = detectBestStrategy(fileMeta?.size || 0)
+    const fallbackOrder = ['filesystem', 'indexeddb', 'memory']
+    const startIndex = fallbackOrder.indexOf(strategyResult.strategy)
+    const strategiesToTry = fallbackOrder.slice(startIndex)
+    
+    let strategy = null
+    let strategyType = null
+    let initError = null
+    
+    for (const type of strategiesToTry) {
+      try {
+        const candidateStrategy = createStrategy(type)
+        await candidateStrategy.init(
+          fileMeta?.name || 'download',
+          fileMeta?.size || 0,
+          fileMeta?.type || 'application/octet-stream'
+        )
+        strategy = candidateStrategy
+        strategyType = type
+        
+        // Log successful strategy initialization
+        console.log(`Storage strategy initialized: ${type}`)
+        break
+      } catch (error) {
+        // Log error and try next strategy (Requirement 7.4)
+        const browserInfo = getBrowserInfo()
+        console.error(`Storage strategy ${type} failed:`, {
+          error: error.message,
+          browser: browserInfo.name,
+          version: browserInfo.version,
+          platform: browserInfo.platform,
+          fileSize: fileMeta?.size,
+        })
+        initError = error
+        
+        // If user cancelled filesystem picker, fall back to next strategy
+        if (error.message?.includes('USER_CANCELLED')) {
+          console.log('User cancelled file picker, falling back to next strategy')
+          continue
+        }
+        
+        // If permission denied, fall back to next strategy
+        if (error.message?.includes('PERMISSION_DENIED')) {
+          console.log('Permission denied, falling back to next strategy')
+          continue
+        }
+      }
+    }
+    
+    if (!strategy) {
+      // All strategies failed (Requirement 7.3)
+      console.error('All storage strategies failed:', initError)
+      setIsAccepting(false)
+      // Could show error to user here
+      return
+    }
+    
+    // Store strategy in context for TransferPage to use
+    setStorageStrategy(strategy)
+    setStorageStrategyType(strategyType)
+    
     emit('accept-transfer')
     setTransferStatus('transferring')
     navigate('/transfer')
@@ -165,6 +237,49 @@ export default function ConfirmPage() {
 
           {/* Action Buttons */}
           <div className="bg-gray-50 px-6 py-6 sm:px-8 border-t border-gray-100">
+            {/* Storage Warning Display */}
+            {storageInfo?.warning && !warningAcknowledged && (
+              <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-500 text-[24px] flex-shrink-0">
+                    warning
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-amber-800 text-sm font-medium mb-1">
+                      Storage Warning
+                    </p>
+                    <p className="text-amber-700 text-sm">
+                      {storageInfo.warning}
+                    </p>
+                    {storageInfo.recommendedBrowser && (
+                      <p className="text-amber-600 text-xs mt-2 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">info</span>
+                        Recommended: {storageInfo.recommendedBrowser}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => setWarningAcknowledged(true)}
+                      className="mt-3 text-amber-700 text-sm font-medium underline hover:text-amber-800"
+                    >
+                      I understand, proceed anyway
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Warning Acknowledged Indicator */}
+            {storageInfo?.warning && warningAcknowledged && (
+              <div className="mb-4 p-3 bg-gray-100 border border-gray-200 rounded-lg flex items-center gap-2">
+                <span className="material-symbols-outlined text-gray-500 text-[18px]">
+                  check_circle
+                </span>
+                <p className="text-gray-600 text-sm">
+                  Storage warning acknowledged
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col-reverse sm:flex-row gap-3">
               <button
                 onClick={handleReject}
@@ -175,7 +290,7 @@ export default function ConfirmPage() {
               </button>
               <button
                 onClick={handleAccept}
-                disabled={!fileMeta || isAccepting}
+                disabled={!fileMeta || isAccepting || (storageInfo?.warning && !warningAcknowledged)}
                 className="flex flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-xl h-12 px-5 bg-primary hover:bg-primary-hover text-text-main text-base font-bold leading-normal tracking-tight transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isAccepting ? (
