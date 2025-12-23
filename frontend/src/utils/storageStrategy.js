@@ -475,12 +475,16 @@ export class IndexedDBStrategy {
       throw new Error('IndexedDBStrategy not initialized')
     }
 
+    // Create a copy of the data to avoid issues with shared ArrayBuffer views
+    // This is important because WebRTC may reuse the underlying buffer
+    const dataCopy = new Uint8Array(data)
+
     // Add chunk to buffer
     this.buffer.push({
       id: `${this.sessionId}_${chunkIndex}`,
       sessionId: this.sessionId,
       index: chunkIndex,
-      data: data,
+      data: dataCopy,
     })
 
     // Flush buffer when it reaches BUFFER_SIZE
@@ -536,7 +540,22 @@ export class IndexedDBStrategy {
     chunks.sort((a, b) => a.index - b.index)
 
     // Combine chunks into a single Blob/File
-    const blobParts = chunks.map(chunk => chunk.data)
+    // Note: IndexedDB may return data as ArrayBuffer instead of Uint8Array
+    // We need to ensure consistent handling by converting to Uint8Array first
+    const blobParts = chunks.map(chunk => {
+      const data = chunk.data
+      // Handle different data types that IndexedDB might return
+      if (data instanceof Uint8Array) {
+        return data
+      } else if (data instanceof ArrayBuffer) {
+        return new Uint8Array(data)
+      } else if (data && data.buffer instanceof ArrayBuffer) {
+        // Handle other TypedArray views
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+      }
+      // Fallback: assume it's already a valid BlobPart
+      return data
+    })
     const file = new File(blobParts, this.fileName, { type: this.mimeType })
 
     return {
@@ -642,9 +661,11 @@ export class MemoryStrategy {
    * @returns {Promise<void>}
    */
   async writeChunk(chunkIndex, data) {
+    // Create a copy of the data to avoid issues with shared ArrayBuffer views
+    const dataCopy = new Uint8Array(data)
     this.chunks.push({
       index: chunkIndex,
-      data: data,
+      data: dataCopy,
     })
   }
 
