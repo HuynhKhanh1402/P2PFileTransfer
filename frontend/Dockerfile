@@ -8,6 +8,14 @@ RUN npm ci
 
 COPY . .
 
+# Build arguments cho Vite
+ARG VITE_API_URL
+ARG VITE_SOCKET_URL
+
+# Set environment variables cho build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
+
 RUN npm run build
 
 FROM node:20-alpine
