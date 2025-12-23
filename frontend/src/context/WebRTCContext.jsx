@@ -47,12 +47,30 @@ export function WebRTCProvider({ children }) {
     stateChangeHandlerRef.current = handler
   }, [])
 
-  const createPeerConnection = useCallback(() => {
-    if (peerConnectionRef.current && 
+  const createPeerConnection = useCallback((forceNew = false) => {
+    if (!forceNew && peerConnectionRef.current && 
         peerConnectionRef.current.connectionState !== 'closed' &&
         peerConnectionRef.current.connectionState !== 'failed') {
       return peerConnectionRef.current
     }
+
+    // Close existing connection if forcing new
+    if (forceNew && peerConnectionRef.current) {
+      try {
+        if (dataChannelRef.current) {
+          dataChannelRef.current.close()
+          dataChannelRef.current = null
+        }
+        peerConnectionRef.current.close()
+      } catch (e) {
+        console.log('[WebRTC] Error closing old connection:', e)
+      }
+    }
+
+    // Reset message tracking for new connection
+    messageSeqRef.current = 0
+    processedMessagesRef.current = new Set()
+    messageQueueRef.current = []
 
     const pc = new RTCPeerConnection(RTC_CONFIG)
 
@@ -122,7 +140,8 @@ export function WebRTCProvider({ children }) {
   }, [updateState])
 
   const createOffer = useCallback(async () => {
-    const pc = createPeerConnection()
+    // Always create a new connection for new transfer session
+    const pc = createPeerConnection(true)
     
     const channel = pc.createDataChannel('fileTransfer', {
       ordered: true,
@@ -142,7 +161,8 @@ export function WebRTCProvider({ children }) {
   }, [createPeerConnection, setupDataChannel])
 
   const createAnswer = useCallback(async (offer) => {
-    const pc = createPeerConnection()
+    // Always create a new connection for new transfer session
+    const pc = createPeerConnection(true)
 
     pc.ondatachannel = (event) => {
       if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
@@ -264,6 +284,8 @@ export function WebRTCProvider({ children }) {
     close()
     setConnectionState('new')
     messageQueueRef.current = [] // Clear message queue on reset
+    messageSeqRef.current = 0 // Reset message sequence counter
+    processedMessagesRef.current = new Set() // Clear processed messages set
   }, [close])
 
   // Check if data channel is ready

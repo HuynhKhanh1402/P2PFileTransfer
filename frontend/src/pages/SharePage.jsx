@@ -103,7 +103,7 @@ export default function SharePage() {
       console.log('Peer disconnected')
       setReceiverConnected(false)
       setStatus('waiting')
-      offerSentRef.current = false
+      offerSentRef.current = false // Reset so we can send offer again when receiver reconnects
     }
 
     on('receiver-connected', handleReceiverConnected)
