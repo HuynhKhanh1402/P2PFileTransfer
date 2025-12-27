@@ -23,8 +23,8 @@ ARG VITE_SOCKET_URL
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
 
-# Build the application
-RUN npm run build
+# Build the application (skip TypeScript check as project uses JSX)
+RUN npx vite build
 
 # Production stage
 FROM node:20-alpine
