@@ -1,0 +1,29 @@
+# Dockerfile for Frontend Development
+FROM node:20-alpine
+
+# Install development tools
+RUN apk add --no-cache bash curl
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm install
+
+# Copy configuration files
+COPY tsconfig*.json ./
+COPY vite.config.ts ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY eslint.config.js ./
+
+# Copy source code (will be overridden by volume mount in dev)
+COPY . .
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Run Vite dev server with host 0.0.0.0 to allow external connections
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

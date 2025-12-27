@@ -11,12 +11,5 @@ module.exports = {
     session: {
         timeout: parseInt(process.env.SESSION_TIMEOUT) || 30 * 60 * 1000,
         cleanupInterval: parseInt(process.env.SESSION_CLEANUP_INTERVAL) || 60000
-    },
-    stun: {
-        servers: process.env.STUN_SERVERS?.split(',') || [
-            'stun:stun.l.google.com:19302',
-            'stun:stun1.l.google.com:19302',
-            'stun:stun2.l.google.com:19302'
-        ]
     }
 };

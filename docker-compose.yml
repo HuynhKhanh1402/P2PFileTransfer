@@ -1,38 +1,43 @@
-version: '3.8'
+# Docker Compose for Production
+# Usage: docker-compose up -d
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: filetransfer-backend
+    container_name: p2p-backend-prod
     ports:
-      - "3001:3001"
+      - "${BACKEND_PORT:-3001}:3001"
+    env_file:
+      - ./backend/.env
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - CORS_ORIGIN=https://filetransfer.khanhhuynh.io.vn,https://ftapi.khanhhuynh.io.vn
-      - SESSION_TIMEOUT=1800000
-      - SESSION_CLEANUP_INTERVAL=60000
-      - STUN_SERVERS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun2.l.google.com:19302
-    restart: unless-stopped
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3001}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - SESSION_TIMEOUT=${SESSION_TIMEOUT:-1800000}
+      - SESSION_CLEANUP_INTERVAL=${SESSION_CLEANUP_INTERVAL:-60000}
     networks:
-      - filetransfer-network
+      - p2p-network
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://ftapi.khanhhuynh.io.vn
-        VITE_SOCKET_URL: https://ftapi.khanhhuynh.io.vn
-    container_name: filetransfer-frontend
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL}
+    container_name: p2p-frontend-prod
     ports:
-      - "5173:5173"
-    restart: unless-stopped
+      - "${FRONTEND_PORT:-5173}:5173"
     networks:
-      - filetransfer-network
+      - p2p-network
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 networks:
-  filetransfer-network:
+  p2p-network:
     driver: bridge
+    name: p2p-filetransfer-network

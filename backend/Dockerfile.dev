@@ -1,0 +1,22 @@
+# Dockerfile for Backend Development
+FROM node:20-alpine
+
+# Install development tools
+RUN apk add --no-cache bash
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm install
+
+# Copy source code (will be overridden by volume mount in dev)
+COPY . .
+
+# Expose port
+EXPOSE 3001
+
+# Use nodemon or --watch flag for hot reload
+CMD ["npm", "run", "dev"]
