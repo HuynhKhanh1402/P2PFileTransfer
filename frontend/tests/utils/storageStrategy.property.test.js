@@ -14,7 +14,7 @@ import {
   detectBestStrategy,
   THRESHOLDS,
   IndexedDBStrategy,
-} from '../storageStrategy'
+} from '../../src/utils/storageStrategy'
 
 // ============================================================================
 // Test Utilities
