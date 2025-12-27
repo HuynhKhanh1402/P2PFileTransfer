@@ -47,12 +47,30 @@ export function WebRTCProvider({ children }) {
     stateChangeHandlerRef.current = handler
   }, [])
 
-  const createPeerConnection = useCallback(() => {
-    if (peerConnectionRef.current && 
+  const createPeerConnection = useCallback((forceNew = false) => {
+    if (!forceNew && peerConnectionRef.current && 
         peerConnectionRef.current.connectionState !== 'closed' &&
         peerConnectionRef.current.connectionState !== 'failed') {
       return peerConnectionRef.current
     }
+
+    // Close existing connection if forcing new
+    if (forceNew && peerConnectionRef.current) {
+      try {
+        if (dataChannelRef.current) {
+          dataChannelRef.current.close()
+          dataChannelRef.current = null
+        }
+        peerConnectionRef.current.close()
+      } catch (e) {
+        console.log('[WebRTC] Error closing old connection:', e)
+      }
+    }
+
+    // Reset message tracking for new connection
+    messageSeqRef.current = 0
+    processedMessagesRef.current = new Set()
+    messageQueueRef.current = []
 
     const pc = new RTCPeerConnection(RTC_CONFIG)
 
@@ -122,7 +140,8 @@ export function WebRTCProvider({ children }) {
   }, [updateState])
 
   const createOffer = useCallback(async () => {
-    const pc = createPeerConnection()
+    // Always create a new connection for new transfer session
+    const pc = createPeerConnection(true)
     
     const channel = pc.createDataChannel('fileTransfer', {
       ordered: true,
@@ -142,7 +161,8 @@ export function WebRTCProvider({ children }) {
   }, [createPeerConnection, setupDataChannel])
 
   const createAnswer = useCallback(async (offer) => {
-    const pc = createPeerConnection()
+    // Always create a new connection for new transfer session
+    const pc = createPeerConnection(true)
 
     pc.ondatachannel = (event) => {
       if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
@@ -197,6 +217,8 @@ export function WebRTCProvider({ children }) {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
     let sentChunks = 0
 
+    console.log(`[WebRTC] Starting file send: ${file.name}, size=${file.size}, totalChunks=${totalChunks}`)
+
     // Send file metadata first
     const meta = {
       type: 'meta',
@@ -206,6 +228,14 @@ export function WebRTCProvider({ children }) {
       totalChunks,
     }
     channel.send(JSON.stringify(meta))
+
+    // Log first and last bytes of original file for comparison
+    const firstBlob = file.slice(0, 16)
+    const lastBlob = file.slice(-16)
+    const firstBytes = new Uint8Array(await firstBlob.arrayBuffer())
+    const lastBytes = new Uint8Array(await lastBlob.arrayBuffer())
+    console.log(`[WebRTC] Original file first 16 bytes: ${Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' ')}`)
+    console.log(`[WebRTC] Original file last 16 bytes: ${Array.from(lastBytes).map(b => b.toString(16).padStart(2, '0')).join(' ')}`)
 
     // Read and send chunks
     for (let i = 0; i < totalChunks; i++) {
@@ -254,6 +284,8 @@ export function WebRTCProvider({ children }) {
     close()
     setConnectionState('new')
     messageQueueRef.current = [] // Clear message queue on reset
+    messageSeqRef.current = 0 // Reset message sequence counter
+    processedMessagesRef.current = new Set() // Clear processed messages set
   }, [close])
 
   // Check if data channel is ready

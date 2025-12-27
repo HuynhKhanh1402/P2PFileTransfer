@@ -9,23 +9,38 @@ export async function calculateSHA256(file, onProgress) {
         throw new Error('Web Crypto API not available. Please use HTTPS or localhost.')
     }
 
+    console.log(`[SHA256] Starting hash calculation for file: ${file.name}, size: ${file.size}, type: ${file.type}`)
+
     // For small files (< 100MB), use Web Crypto API directly (fastest)
     const SMALL_FILE_THRESHOLD = 100 * 1024 * 1024 // 100MB
     
     if (file.size < SMALL_FILE_THRESHOLD) {
         try {
+            console.log(`[SHA256] Using Web Crypto API (native) for small file`)
             onProgress?.(10)
             const arrayBuffer = await file.arrayBuffer()
+            console.log(`[SHA256] ArrayBuffer size: ${arrayBuffer.byteLength}`)
+            
+            // Log first and last 16 bytes for debugging
+            const bytes = new Uint8Array(arrayBuffer)
+            const first16 = Array.from(bytes.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+            const last16 = Array.from(bytes.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+            console.log(`[SHA256] First 16 bytes: ${first16}`)
+            console.log(`[SHA256] Last 16 bytes: ${last16}`)
+            
             onProgress?.(50)
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
+            const hash = arrayBufferToHex(hashBuffer)
+            console.log(`[SHA256] Calculated hash (native): ${hash}`)
             onProgress?.(100)
-            return arrayBufferToHex(hashBuffer)
+            return hash
         } catch (error) {
             console.warn('Simple hash failed, falling back to streaming:', error.message)
         }
     }
 
     // For large files, use optimized chunked approach
+    console.log(`[SHA256] Using chunked approach for large file`)
     return await calculateSHA256Chunked(file, onProgress)
 }
 

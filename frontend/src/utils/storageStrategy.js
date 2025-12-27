@@ -422,6 +422,8 @@ export class IndexedDBStrategy {
     this.mimeType = ''
     this.totalChunks = 0
     this.chunksWritten = 0
+    this.writeQueue = Promise.resolve() // Queue to serialize write operations
+    this.pendingWrites = 0 // Track pending write operations
   }
 
   /**
@@ -438,6 +440,8 @@ export class IndexedDBStrategy {
     this.sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
     this.buffer = []
     this.chunksWritten = 0
+    this.writeQueue = Promise.resolve()
+    this.pendingWrites = 0
 
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(IndexedDBStrategy.DB_NAME, IndexedDBStrategy.DB_VERSION)
@@ -466,6 +470,7 @@ export class IndexedDBStrategy {
 
   /**
    * Write a chunk to buffer, flush to IndexedDB when buffer is full (Requirement 2.2)
+   * Uses a write queue to ensure sequential operations and prevent race conditions
    * @param {number} chunkIndex - Index of the chunk
    * @param {Uint8Array} data - Chunk data
    * @returns {Promise<void>}
@@ -475,18 +480,32 @@ export class IndexedDBStrategy {
       throw new Error('IndexedDBStrategy not initialized')
     }
 
-    // Add chunk to buffer
-    this.buffer.push({
-      id: `${this.sessionId}_${chunkIndex}`,
-      sessionId: this.sessionId,
-      index: chunkIndex,
-      data: data,
+    // Create a copy of the data to avoid issues with shared ArrayBuffer views
+    // This is important because WebRTC may reuse the underlying buffer
+    const dataCopy = new Uint8Array(data)
+
+    // Queue the write operation to ensure sequential execution
+    this.pendingWrites++
+    this.writeQueue = this.writeQueue.then(async () => {
+      try {
+        // Add chunk to buffer
+        this.buffer.push({
+          id: `${this.sessionId}_${chunkIndex}`,
+          sessionId: this.sessionId,
+          index: chunkIndex,
+          data: dataCopy,
+        })
+
+        // Flush buffer when it reaches BUFFER_SIZE
+        if (this.buffer.length >= IndexedDBStrategy.BUFFER_SIZE) {
+          await this._flushBuffer()
+        }
+      } finally {
+        this.pendingWrites--
+      }
     })
 
-    // Flush buffer when it reaches BUFFER_SIZE
-    if (this.buffer.length >= IndexedDBStrategy.BUFFER_SIZE) {
-      await this._flushBuffer()
-    }
+    return this.writeQueue
   }
 
   /**
@@ -496,13 +515,15 @@ export class IndexedDBStrategy {
   async _flushBuffer() {
     if (this.buffer.length === 0) return
 
+    const chunksToWrite = [...this.buffer]
+    this.buffer = []
+
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([IndexedDBStrategy.STORE_NAME], 'readwrite')
       const store = transaction.objectStore(IndexedDBStrategy.STORE_NAME)
 
       transaction.oncomplete = () => {
-        this.chunksWritten += this.buffer.length
-        this.buffer = []
+        this.chunksWritten += chunksToWrite.length
         resolve()
       }
 
@@ -511,7 +532,7 @@ export class IndexedDBStrategy {
       }
 
       // Write all buffered chunks
-      for (const chunk of this.buffer) {
+      for (const chunk of chunksToWrite) {
         store.put(chunk)
       }
     })
@@ -526,18 +547,94 @@ export class IndexedDBStrategy {
       throw new Error('IndexedDBStrategy not initialized')
     }
 
+    // Wait for all pending write operations to complete
+    console.log(`[IndexedDB] Finalize: waiting for write queue to complete, pendingWrites=${this.pendingWrites}`)
+    await this.writeQueue
+
     // Flush any remaining buffered chunks
+    console.log(`[IndexedDB] Finalize: flushing remaining ${this.buffer.length} buffered chunks`)
     await this._flushBuffer()
 
     // Retrieve all chunks from IndexedDB and reassemble
     const chunks = await this._getAllChunks()
     
+    console.log(`[IndexedDB] Finalize: retrieved ${chunks.length} chunks from IndexedDB`)
+    
     // Sort chunks by index
     chunks.sort((a, b) => a.index - b.index)
 
+    // Log chunk info for debugging
+    let totalSize = 0
+    const chunkSizes = []
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]
+      const data = chunk.data
+      let size = 0
+      if (data instanceof Uint8Array) {
+        size = data.byteLength
+      } else if (data instanceof ArrayBuffer) {
+        size = data.byteLength
+      } else if (data && data.buffer instanceof ArrayBuffer) {
+        size = data.byteLength
+      } else if (data && data.length !== undefined) {
+        size = data.length
+      }
+      totalSize += size
+      chunkSizes.push({ index: chunk.index, size, type: data?.constructor?.name || typeof data })
+    }
+    console.log(`[IndexedDB] Total size from chunks: ${totalSize}, expected: ${this.fileSize}`)
+    console.log(`[IndexedDB] First 5 chunks:`, chunkSizes.slice(0, 5))
+    console.log(`[IndexedDB] Last 5 chunks:`, chunkSizes.slice(-5))
+    
+    // Check for missing chunks
+    const expectedChunks = Math.ceil(this.fileSize / (64 * 1024))
+    if (chunks.length !== expectedChunks) {
+      console.warn(`[IndexedDB] Chunk count mismatch! Expected ${expectedChunks}, got ${chunks.length}`)
+    }
+    
+    // Check for duplicate or out-of-order chunks
+    const seenIndices = new Set()
+    for (const chunk of chunks) {
+      if (seenIndices.has(chunk.index)) {
+        console.warn(`[IndexedDB] Duplicate chunk index: ${chunk.index}`)
+      }
+      seenIndices.add(chunk.index)
+    }
+
     // Combine chunks into a single Blob/File
-    const blobParts = chunks.map(chunk => chunk.data)
+    // Note: IndexedDB may return data as ArrayBuffer instead of Uint8Array
+    // We need to ensure consistent handling by converting to Uint8Array first
+    const blobParts = chunks.map(chunk => {
+      const data = chunk.data
+      // Handle different data types that IndexedDB might return
+      if (data instanceof Uint8Array) {
+        return data
+      } else if (data instanceof ArrayBuffer) {
+        return new Uint8Array(data)
+      } else if (data && data.buffer instanceof ArrayBuffer) {
+        // Handle other TypedArray views
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+      }
+      // Fallback: assume it's already a valid BlobPart
+      return data
+    })
+    
+    // Log first and last chunk bytes for debugging
+    if (blobParts.length > 0) {
+      const firstChunk = blobParts[0]
+      const lastChunk = blobParts[blobParts.length - 1]
+      if (firstChunk instanceof Uint8Array) {
+        const first16 = Array.from(firstChunk.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        console.log(`[IndexedDB] First chunk first 16 bytes: ${first16}`)
+      }
+      if (lastChunk instanceof Uint8Array) {
+        const last16 = Array.from(lastChunk.slice(-16)).map(b => b.toString(16).padStart(2, '0')).join(' ')
+        console.log(`[IndexedDB] Last chunk last 16 bytes: ${last16}`)
+      }
+    }
+    
     const file = new File(blobParts, this.fileName, { type: this.mimeType })
+    console.log(`[IndexedDB] Created file: name=${file.name}, size=${file.size}, type=${file.type}`)
 
     return {
       type: 'indexeddb',
@@ -572,6 +669,13 @@ export class IndexedDBStrategy {
    */
   async cleanup() {
     if (!this.db) return
+
+    // Wait for any pending writes to complete
+    try {
+      await this.writeQueue
+    } catch {
+      // Ignore errors from pending writes during cleanup
+    }
 
     // Clear buffer
     this.buffer = []
@@ -642,9 +746,11 @@ export class MemoryStrategy {
    * @returns {Promise<void>}
    */
   async writeChunk(chunkIndex, data) {
+    // Create a copy of the data to avoid issues with shared ArrayBuffer views
+    const dataCopy = new Uint8Array(data)
     this.chunks.push({
       index: chunkIndex,
-      data: data,
+      data: dataCopy,
     })
   }
 
