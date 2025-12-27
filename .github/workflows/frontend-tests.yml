@@ -14,6 +14,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15 
     
     strategy:
       matrix:
@@ -36,6 +37,9 @@ jobs:
     - name: Run tests
       working-directory: ./frontend
       run: npm test
+      timeout-minutes: 10  # Test timeout
+      env:
+        CI: true 
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3

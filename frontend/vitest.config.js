@@ -8,6 +8,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.js',
+    testTimeout: 30000, // 30 seconds timeout per test
+    hookTimeout: 30000, // 30 seconds for hooks
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

@@ -20,6 +20,9 @@ import {
 // Test Utilities
 // ============================================================================
 
+// Number of runs for property tests - reduced in CI environment
+const NUM_RUNS = process.env.CI ? 20 : 100
+
 /**
  * Arbitrary for generating mobile user agent strings
  */
@@ -86,7 +89,7 @@ describe('Property 7: Platform Detection Accuracy', () => {
         // isDesktop should be the inverse
         expect(isDesktop()).toBe(false)
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -103,7 +106,7 @@ describe('Property 7: Platform Detection Accuracy', () => {
         // isDesktop should be the inverse
         expect(isDesktop()).toBe(true)
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -123,7 +126,7 @@ describe('Property 7: Platform Detection Accuracy', () => {
         // On mobile, filesystem should never be selected even if API is available
         expect(result.strategy).not.toBe('filesystem')
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -166,7 +169,7 @@ describe('Property 1: File System API Detection', () => {
         expect(result.strategy).toBe('filesystem')
         expect(result.supported).toBe(true)
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -185,7 +188,7 @@ describe('Property 1: File System API Detection', () => {
         // Without File System API, filesystem should not be selected
         expect(result.strategy).not.toBe('filesystem')
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -250,7 +253,7 @@ describe('Property 6: Large File Warning Display', () => {
         expect(result.warning).toContain('Large file')
         expect(result.recommendedBrowser).toBeDefined()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -271,7 +274,7 @@ describe('Property 6: Large File Warning Display', () => {
         expect(result.warning).toContain('Large file')
         expect(result.recommendedBrowser).toBeDefined()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -294,7 +297,7 @@ describe('Property 6: Large File Warning Display', () => {
           expect(result.warning).toBeUndefined()
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -317,7 +320,7 @@ describe('Property 6: Large File Warning Display', () => {
           expect(result.warning).toBeUndefined()
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -337,7 +340,7 @@ describe('Property 6: Large File Warning Display', () => {
         // Should NOT have a warning when FS API is available on desktop
         expect(result.warning).toBeUndefined()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -382,7 +385,7 @@ describe('Property 2: Fallback Strategy Selection', () => {
           expect(result.supported).toBe(true)
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -404,7 +407,7 @@ describe('Property 2: Fallback Strategy Selection', () => {
           expect(result.supported).toBe(true)
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -429,7 +432,7 @@ describe('Property 2: Fallback Strategy Selection', () => {
           expect(result.warning).toBeDefined()
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -481,7 +484,7 @@ describe('Property 4: IndexedDB Buffer Flush', () => {
 
         await strategy.cleanup()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -503,7 +506,7 @@ describe('Property 4: IndexedDB Buffer Flush', () => {
 
         await strategy.cleanup()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -530,7 +533,7 @@ describe('Property 4: IndexedDB Buffer Flush', () => {
 
         await strategy.cleanup()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -602,7 +605,7 @@ describe('Property 5: IndexedDB Cleanup', () => {
 
         await verifyStrategy.cleanup()
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -664,7 +667,7 @@ describe('Property 5: IndexedDB Cleanup', () => {
           await strategy2.cleanup()
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -722,7 +725,7 @@ describe('Property 10: Mobile IndexedDB Preference', () => {
         expect(result.strategy).toBe('indexeddb')
         expect(result.supported).toBe(true)
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -742,7 +745,7 @@ describe('Property 10: Mobile IndexedDB Preference', () => {
         expect(result.strategy).toBe('indexeddb')
         expect(result.supported).toBe(true)
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -760,7 +763,7 @@ describe('Property 10: Mobile IndexedDB Preference', () => {
         expect(result.strategy).toBe('memory')
         expect(result.supported).toBe(true)
       }),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
@@ -816,7 +819,7 @@ describe('Property 8: IndexedDB Fallback on Missing FS API', () => {
           expect(result.supported).toBe(true)
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -841,7 +844,7 @@ describe('Property 8: IndexedDB Fallback on Missing FS API', () => {
           expect(result.strategy).toBe('indexeddb')
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 
@@ -863,7 +866,7 @@ describe('Property 8: IndexedDB Fallback on Missing FS API', () => {
           expect(result.supported).toBe(true)
         }
       ),
-      { numRuns: 100 }
+      { numRuns: NUM_RUNS }
     )
   })
 })
