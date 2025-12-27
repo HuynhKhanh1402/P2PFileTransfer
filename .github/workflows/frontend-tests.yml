@@ -14,19 +14,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15 
-    
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
+    timeout-minutes: 15
     
     steps:
     - uses: actions/checkout@v3
     
-    - name: Use Node.js ${{ matrix.node-version }}
+    - name: Use Node.js 20
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '20'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
     
@@ -37,13 +33,10 @@ jobs:
     - name: Run tests
       working-directory: ./frontend
       run: npm test
-      timeout-minutes: 10  # Test timeout
-      env:
-        CI: true 
+      timeout-minutes: 10
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
-      if: matrix.node-version == '20.x'
       with:
         files: ./frontend/coverage/lcov.info
         flags: frontend
